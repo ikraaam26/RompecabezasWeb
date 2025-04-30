@@ -12,6 +12,7 @@ export default function Perfil() {
   const [nuevoCorreo, setNuevoCorreo] = useState('');
   const [nuevaPassword, setNuevaPassword] = useState('');
   const [mensaje, setMensaje] = useState('');
+  const [userId, setUserId] = useState('');
 
   useEffect(() => {
     const obtenerUsuario = async () => {
@@ -28,6 +29,7 @@ export default function Perfil() {
       const firstName = user.user_metadata?.first_name || 'Usuario';
       setNombre(firstName);
       setEmail(user.email || '');
+      setUserId(user.id);
     };
 
     obtenerUsuario();
@@ -40,9 +42,6 @@ export default function Perfil() {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user.id;
-
       const { error: authError } = await supabase.auth.updateUser({ email: nuevoCorreo });
       if (authError) throw authError;
 
@@ -53,7 +52,9 @@ export default function Perfil() {
 
       if (userError) throw userError;
 
-      setMensaje('Correo actualizado. Revisa tu nuevo correo y confirma el cambio desde el enlace que te hemos enviado.');
+      setMensaje(
+        'Correo actualizado. Revisa tu nuevo correo y confirma el cambio desde el enlace que te hemos enviado.'
+      );
     } catch (error) {
       setMensaje(`Error: ${error.message}`);
     }
@@ -85,28 +86,28 @@ export default function Perfil() {
     router.push('/login');
   };
 
-  const eliminarUsuario = async () => {
+  const eliminarCuenta = async () => {
+    const confirmacion = confirm('¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer.');
+    if (!confirmacion) return;
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user.id;
+      const res = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
 
-      // Eliminar el usuario de la tabla personalizada
-      const { error: userError } = await supabase
-        .from('usuarios')
-        .delete()
-        .eq('id', userId);
-      if (userError) throw userError;
+      const data = await res.json();
 
-      // Eliminar el usuario de Auth
-      const { error: authError } = await supabase.auth.api.deleteUser(user.id);
-      if (authError) throw authError;
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al eliminar el usuario.');
+      }
 
-      setMensaje('Tu cuenta ha sido eliminada con éxito.');
-      setTimeout(() => {
-        router.push('/login');
-      }, 2500);
+      setMensaje('Cuenta eliminada correctamente.');
+      await supabase.auth.signOut();
+      router.push('/login');
     } catch (error) {
-      setMensaje(`Error: ${error.message}`);
+      setMensaje(`Error al eliminar cuenta: ${error.message}`);
     }
   };
 
@@ -114,66 +115,62 @@ export default function Perfil() {
     <>
       <Navbar />
 
-      <main className="h-screen flex flex-col justify-center items-center bg-gradient-to-br from-purple-800 to-indigo-900 text-white p-6">
-        <div className="w-full max-w-md bg-gray-800 rounded-lg shadow-xl p-8">
-          <h1 className="text-3xl font-bold mb-4 text-center">Bienvenido, {nombre} 👋</h1>
-          <p className="text-xl text-center mb-6">{email}</p>
+      <main className="h-screen flex flex-col justify-center items-center bg-gradient-to-br from-purple-800 to-indigo-900 text-white">
+        <h1 className="text-4xl font-bold mb-2">Bienvenido, {nombre} 👋</h1>
+        <p className="text-lg mb-6">{email}</p>
 
-          {/* Formulario para cambiar el correo */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-300 mb-2">Nuevo correo electrónico</label>
-            <input
-              type="email"
-              placeholder="Nuevo correo electrónico"
-              value={nuevoCorreo}
-              onChange={(e) => setNuevoCorreo(e.target.value)}
-              className="w-full p-3 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <button
-              onClick={cambiarCorreo}
-              className="w-full mt-4 py-2 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 transition"
-            >
-              Cambiar correo
-            </button>
-          </div>
-
-          {/* Formulario para cambiar la contraseña */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-300 mb-2">Nueva contraseña</label>
-            <input
-              type="password"
-              placeholder="Nueva contraseña"
-              value={nuevaPassword}
-              onChange={(e) => setNuevaPassword(e.target.value)}
-              className="w-full p-3 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <button
-              onClick={cambiarPassword}
-              className="w-full mt-4 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 transition"
-            >
-              Cambiar contraseña
-            </button>
-          </div>
-
-          {/* Mensaje de éxito o error */}
-          {mensaje && <p className="text-lg mt-4 text-center text-yellow-300">{mensaje}</p>}
-
-          {/* Botón de eliminar cuenta */}
+        {/* Cambiar correo */}
+        <div className="mb-6 flex flex-col items-center">
+          <input
+            type="email"
+            placeholder="Nuevo correo electrónico"
+            value={nuevoCorreo}
+            onChange={(e) => setNuevoCorreo(e.target.value)}
+            className="bg-gray-700 text-white p-2 rounded-md mb-2 w-72"
+          />
           <button
-            onClick={eliminarUsuario}
-            className="w-full mt-6 py-2 bg-red-600 text-white font-bold rounded-md hover:bg-red-700 transition"
+            onClick={cambiarCorreo}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition"
           >
-            Eliminar cuenta
-          </button>
-
-          {/* Botón de cerrar sesión */}
-          <button
-            onClick={cerrarSesion}
-            className="w-full mt-4 py-2 bg-gray-600 text-white font-bold rounded-md hover:bg-gray-700 transition"
-          >
-            Cerrar sesión
+            Cambiar correo
           </button>
         </div>
+
+        {/* Cambiar contraseña */}
+        <div className="mb-6 flex flex-col items-center">
+          <input
+            type="password"
+            placeholder="Nueva contraseña"
+            value={nuevaPassword}
+            onChange={(e) => setNuevaPassword(e.target.value)}
+            className="bg-gray-700 text-white p-2 rounded-md mb-2 w-72"
+          />
+          <button
+            onClick={cambiarPassword}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition"
+          >
+            Cambiar contraseña
+          </button>
+        </div>
+
+        {/* Mensaje */}
+        {mensaje && <p className="text-lg mt-4 text-center">{mensaje}</p>}
+
+        {/* Cerrar sesión */}
+        <button
+          onClick={cerrarSesion}
+          className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition mt-4"
+        >
+          Cerrar sesión
+        </button>
+
+        {/* Eliminar cuenta */}
+        <button
+          onClick={eliminarCuenta}
+          className="bg-red-900 hover:bg-red-800 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition mt-6"
+        >
+          Eliminar cuenta
+        </button>
       </main>
     </>
   );
