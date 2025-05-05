@@ -73,6 +73,7 @@ export default function Navbar() {
   };
 
   return (
+    <header>
     <nav className="w-full bg-gray-900/80 backdrop-blur-sm text-white px-6 py-4 flex items-center justify-between fixed top-0 left-0 right-0 z-10 shadow-lg">
       <div
         className="text-2xl font-bold tracking-wider cursor-pointer hover:text-cyan-300 transition"
@@ -179,5 +180,6 @@ export default function Navbar() {
         </div>
       )}
     </nav>
+    </header>
   );
 }
