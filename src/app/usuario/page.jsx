@@ -13,20 +13,17 @@ export default function HomePage() {
   const [usuario, setUsuario] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filtroNombre, setFiltroNombre] = useState('');
-  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     const obtenerDatos = async () => {
       setLoading(true);
       try {
-        // Verificar sesión de usuario
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
           router.push('/login');
           return;
         }
 
-        // Obtener datos del usuario
         const { data: userData } = await supabase
           .from('usuarios')
           .select('*')
@@ -35,13 +32,9 @@ export default function HomePage() {
 
         setUsuario(userData);
 
-        // Obtener imágenes de rompecabezas
         const { data: imagenesData } = await supabase
           .from('imagenesrompecabezas')
-          .select(`
-            *,
-            partidas(*)
-          `)
+          .select(`*, partidas(*)`)
           .order('fechasubida', { ascending: false });
 
         setImagenes(imagenesData || []);
@@ -56,16 +49,13 @@ export default function HomePage() {
   }, [router]);
 
   const iniciarJuego = (idImagen) => {
-    // Navegar a la página de juego con la ID de la imagen
     router.push(`/usuario/juego?imagen=${idImagen}`);
   };
 
-  // Filtrar imágenes por nombre
   const imagenesFiltradas = imagenes.filter(img =>
     img.nombre.toLowerCase().includes(filtroNombre.toLowerCase())
   );
 
-  // Obtener las últimas partidas jugadas por el usuario actual
   const obtenerUltimasPartidas = () => {
     if (!usuario || !imagenes.length) return [];
 
@@ -75,7 +65,7 @@ export default function HomePage() {
         const partidasDeImagen = img.partidas
           .filter(p => p.idusuario === usuario.id)
           .sort((a, b) => new Date(b.fechahora) - new Date(a.fechahora))
-          .slice(0, 1);   // Solo la más reciente de cada imagen
+          .slice(0, 1);
 
         if (partidasDeImagen.length > 0) {
           partidasUsuario.push({
@@ -89,7 +79,7 @@ export default function HomePage() {
 
     return partidasUsuario
       .sort((a, b) => new Date(b.fechahora) - new Date(a.fechahora))
-      .slice(0, 3);   // Solo las 3 partidas más recientes
+      .slice(0, 3);
   };
 
   const ultimasPartidas = obtenerUltimasPartidas();
@@ -99,7 +89,6 @@ export default function HomePage() {
       <Navbar />
 
       <div className="min-h-screen bg-gray-900 text-white">
-        {/* Contenido principal con padding superior para evitar solapamiento con navbar */}
         <main className="container mx-auto px-4 pt-20 pb-16">
           {/* Saludo al usuario */}
           <div className="mb-8 pt-4">
@@ -111,14 +100,42 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Contenedor para Clasificación y Estadísticas en paralelo */}
+          {/* 🔥 Sección nuevas: Últimas partidas jugadas */}
+          {ultimasPartidas.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-xl font-bold flex items-center text-white mb-4">
+                <Clock className="text-cyan-400 mr-2" size={20} />
+                Tus últimas partidas
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {ultimasPartidas.map((partida) => (
+                  <div
+                    key={partida.idpartida}
+                    className="bg-gray-800/60 backdrop-blur-md rounded-lg p-4 shadow-md"
+                  >
+                    <img
+                      src={partida.imagenUrl}
+                      alt={`Imagen de ${partida.imagenNombre}`}
+                      className="w-full h-32 object-cover rounded-md mb-3"
+                    />
+                    <h3 className="text-lg font-semibold text-cyan-300 mb-1">{partida.imagenNombre}</h3>
+                    <p className="text-sm text-gray-400">
+                      Jugado el {new Date(partida.fechahora).toLocaleDateString()} a las{' '}
+                      {new Date(partida.fechahora).toLocaleTimeString()}
+                    </p>
+                    <p className="text-sm text-yellow-400 mt-1 font-medium">Puntuación: {partida.puntos}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Clasificación y estadísticas */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {/* Tabla de clasificación */}
             <div className="lg:col-span-1">
               <LeaderboardTable limit={5} showSearch={false} className="shadow-lg" />
             </div>
 
-            {/* Estadísticas del usuario */}
             <div className="lg:col-span-1">
               {usuario && (
                 <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg">
@@ -149,7 +166,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Contenedor para los Rompecabezas Disponibles */}
+          {/* Rompecabezas Disponibles */}
           <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg mb-8">
             <div className="p-5 bg-gradient-to-r from-purple-900/80 to-indigo-900/80 flex justify-between items-center">
               <h2 className="text-xl font-bold flex items-center">
@@ -157,7 +174,6 @@ export default function HomePage() {
                 Rompecabezas Disponibles
               </h2>
 
-              {/* Buscador de rompecabezas */}
               <div className="relative">
                 <input
                   type="text"
@@ -188,9 +204,7 @@ export default function HomePage() {
                     />
                     <div className="p-4 flex justify-center">
                       <button
-                        onClick={() => {
-                          iniciarJuego(imagen.idimagen);
-                        }}
+                        onClick={() => iniciarJuego(imagen.idimagen)}
                         className="bg-cyan-500 text-white rounded-lg py-2 px-6 font-semibold hover:bg-cyan-600 transition"
                       >
                         Jugar
@@ -202,10 +216,11 @@ export default function HomePage() {
             ) : (
               <div className="p-10 text-center text-gray-400">
                 <div className="text-5xl mb-4">🧩</div>
-                {filtroNombre ?
-                  <p>No se encontraron rompecabezas con ese nombre.</p> :
+                {filtroNombre ? (
+                  <p>No se encontraron rompecabezas con ese nombre.</p>
+                ) : (
                   <p>No hay rompecabezas disponibles actualmente.</p>
-                }
+                )}
               </div>
             )}
           </div>
