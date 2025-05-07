@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import { Trophy, Gamepad2, LogOut, Home, User, Award } from 'lucide-react';
 
-export default function Navbar() {
+export default function MenuLateral() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [inicial, setInicial] = useState('');
@@ -85,17 +85,11 @@ export default function Navbar() {
               onClick={togglePerfilMenu}
               className="w-10 h-10 rounded-full overflow-hidden cursor-pointer hover:ring-2 hover:ring-cyan-300 transition"
             >
-              {profileUrl ? (
                 <img
                   src={profileUrl}
                   alt="Perfil"
                   className="w-full h-full object-cover"
                 />
-              ) : (
-                <div className="w-full h-full bg-purple-600 flex items-center justify-center text-white font-bold">
-                  {inicial}
-                </div>
-              )}
             </div>
             
             {/* Menú desplegable del perfil en móvil */}
@@ -177,17 +171,11 @@ export default function Navbar() {
         <div className="hidden md:block border-t border-gray-700 p-4">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full overflow-hidden">
-              {profileUrl ? (
                 <img
                   src={profileUrl}
                   alt="Perfil"
                   className="w-full h-full object-cover"
                 />
-              ) : (
-                <div className="w-full h-full bg-purple-600 flex items-center justify-center text-white font-bold">
-                  {inicial}
-                </div>
-              )}
             </div>
             <div className="overflow-hidden">
               <div className="font-medium truncate">

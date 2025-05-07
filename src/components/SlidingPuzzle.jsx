@@ -198,15 +198,15 @@ export default function Puzzle({ imageUrl, nombre, idImagen }) {
       
       // 2. Guardar la partida en la tabla Partidas
       const { error: partidaError } = await supabase
-        .from('Partidas')
+        .from('partidas')
         .insert({
-          IdUsuario: user.id,
-          IdImagen: idImagen,
-          TamañoRompecabezas: `${puzzleSize}x${puzzleSize}`,
-          TiempoJugado: timer,
-          Movimientos: moveCount,
-          Puntaje: finalPoints,
-          Monedas: finalCoins
+          idusuario: user.id,
+          idimagen: idImagen,
+          tamañorompecabezas: `${puzzleSize}x${puzzleSize}`,
+          tiempojugado: timer,
+          movimientos: moveCount,
+          puntos: finalPoints,
+          monedas: finalCoins
         });
       
       if (partidaError) {
@@ -215,12 +215,12 @@ export default function Puzzle({ imageUrl, nombre, idImagen }) {
       
       // 3. Actualizar puntos y monedas del usuario
       const { error: updateError } = await supabase
-        .from('Usuarios')
+        .from('usuarios')
         .update({
-          TotalPuntos: supabase.rpc('increment', { x: finalPoints }),
-          TotalMonedas: supabase.rpc('increment', { x: finalCoins })
+          totalpuntos: supabase.rpc('increment', { x: finalPoints }),
+          totalmonedas: supabase.rpc('increment', { x: finalCoins })
         })
-        .eq('Id', user.id);
+        .eq('id', user.id);
       
       if (updateError) {
         throw new Error(`Error al actualizar usuario: ${updateError.message}`);

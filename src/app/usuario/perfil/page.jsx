@@ -25,6 +25,8 @@ export default function PerfilPage() {
   const [selectedAvatar, setSelectedAvatar] = useState(null);
   const [showNotification, setShowNotification] = useState(false);
   const itemsPerPage = 4;
+  const [totalPartidas, setTotalPartidas] = useState(0);
+
 
   // Cargar datos del usuario y avatares disponibles
   useEffect(() => {
@@ -49,6 +51,18 @@ export default function PerfilPage() {
         } else if (userError) {
           console.error('Error al cargar datos del usuario:', userError);
           setMessage({ text: 'Error al cargar perfil', type: 'error' });
+        }
+
+        // 🔢 Contar partidas jugadas
+        const { count, error: countError } = await supabase
+        .from('partidas')
+        .select('*', { count: 'exact', head: true })
+        .eq('idusuario', session.user.id);
+
+        if (countError) {
+          console.error('Error al contar partidas:', countError.message);
+        } else {
+          setTotalPartidas(count); // ← Define esto con useState
         }
         
         // Cargar avatares disponibles
@@ -86,6 +100,8 @@ export default function PerfilPage() {
     cargarDatos();
   }, []);
 
+  
+
   // Manejar cambios en los campos de edición
   const handleChange = (e) => {
     setPerfilData({ ...perfilData, [e.target.name]: e.target.value });
@@ -105,9 +121,16 @@ export default function PerfilPage() {
   // Guardar cambios en el perfil
   const handleSave = async () => {
     setLoading(true);
-    
+  
     try {
-      // Actualizar en la tabla usuarios el nombre y el email
+      // Primero actualizamos en auth.users
+      const { error: authError } = await supabase.auth.updateUser({
+        email: perfilData.email
+      });
+  
+      if (authError) throw authError;
+  
+      // Si lo anterior funciona, ahora actualizamos en la tabla usuarios
       const { error: usuariosError } = await supabase
         .from('usuarios')
         .update({
@@ -115,16 +138,9 @@ export default function PerfilPage() {
           email: perfilData.email
         })
         .eq('id', user.id);
-        
+  
       if (usuariosError) throw usuariosError;
-      
-      // Actualizar en auth.users (email)
-      const { error: authError } = await supabase.auth.updateUser({
-        email: perfilData.email
-      });
-      
-      if (authError) throw authError;
-      
+  
       showMessage('Perfil actualizado correctamente', 'success');
       setEditing(false);
     } catch (error) {
@@ -141,36 +157,38 @@ export default function PerfilPage() {
       setConfirmDelete(true);
       return;
     }
-
+  
     setLoading(true);
-
+  
     try {
-      // Eliminar de la tabla usuarios
-      const { error: deleteError } = await supabase
-        .from('usuarios')
-        .delete()
-        .eq('id', user.id);
-
-      if (deleteError) throw deleteError;
-
-      // Cambiar el correo en Supabase Auth a 'deleted'
-      const { error: authUpdateError } = await supabase.auth.updateUser({
-        email: 'deleted_' + user.email,
+      const response = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }),
       });
+  
+      const data = await response.json();
+  
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo eliminar la cuenta.');
+      }
 
-      if (authUpdateError) throw authUpdateError;
-
-      // Redirigir a la página de inicio
-      window.location.href = '/';
-
+      // Cerrar sesión del cliente
+      await supabase.auth.signOut();
+  
+      // Redirigir al login si todo fue bien
+      window.location.href = '/login';
     } catch (error) {
       console.error('Error al eliminar cuenta:', error);
-      showMessage('Error al eliminar la cuenta: ' + (error.message || 'Contacta al administrador'), 'error');
+      showMessage('Error al eliminar la cuenta: ' + error.message, 'error');
       setConfirmDelete(false);
       setLoading(false);
     }
   };
-
+  
+  console.log(perfilData)
   // Comprar un avatar
   const comprarAvatar = async (avatar) => {
     if (perfilData.totalmonedas < avatar.precio) {
@@ -180,7 +198,7 @@ export default function PerfilPage() {
   
     setSelectedAvatar(avatar);
     setLoading(true);
-  
+   
     try {
       // Actualizar el usuario con la nueva foto de perfil y restar monedas
       const { error: userError } = await supabase
@@ -321,21 +339,22 @@ export default function PerfilPage() {
           </div>
         )}
         
-        <div className="max-w-5xl mx-auto">
-          {/* Encabezado */}
+        <div className="max-w-7xl mx-auto">
+          {/* Encabezado 
           <div className="text-center mb-10">
             <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 drop-shadow-glow">
               Perfil de Jugador
             </h1>
             <p className="text-gray-300 mt-3 text-lg">Personaliza tu experiencia en PicGrid</p>
           </div>
+          */}
           
           <div className="grid md:grid-cols-3 gap-8">
             {/* Panel izquierdo - Foto de perfil con efectos */}
             <div className="bg-gray-800/40 rounded-2xl shadow-xl backdrop-blur-md border border-gray-700/50 overflow-hidden">
               <div className="relative h-20 bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-center overflow-hidden">
                 <div className="absolute inset-0 bg-[url('/pattern-hero.svg')] opacity-40 animate-pulse"></div>
-                <h2 className="relative text-xl font-bold text-white">Tu Héroe</h2>
+                <h2 className="relative text-xl font-bold text-white">Foto de perfíl</h2>
               </div>
               
               <div className="p-6">
@@ -586,37 +605,17 @@ export default function PerfilPage() {
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="flex items-center text-gray-300">
-                        <Star size={16} className="mr-2 text-cyan-400" />
-                        Precisión
-                      </span>
-                      <span className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">
-                        75%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-700/50 rounded-full h-2 overflow-hidden">
-                      <div 
-                        className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full"
-                        style={{ width: '75%' }}
-                      >
-                        <div className="w-full h-full bg-[url('/shine-line.svg')] bg-cover animate-shine"></div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="flex items-center text-gray-300">
                         <Shield size={16} className="mr-2 text-emerald-400" />
                         Partidas Jugadas
                       </span>
                       <span className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-400">
-                        12
+                         {totalPartidas}
                       </span>
                     </div>
                     <div className="w-full bg-gray-700/50 rounded-full h-2 overflow-hidden">
                       <div 
                         className="bg-gradient-to-r from-emerald-500 to-green-500 h-full"
-                        style={{ width: '40%' }}
+                        style={{ width: `${Math.min(100, totalPartidas)}%` }}
                       >
                         <div className="w-full h-full bg-[url('/shine-line.svg')] bg-cover animate-shine"></div>
                       </div>
