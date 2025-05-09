@@ -3,10 +3,10 @@ const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
 
 // Configura tu Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(
+  "https://nipgqvjtsxdytuwlbain.supabase.co",  // ← Sustituye por tu URL
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pcGdxdmp0c3hkeXR1d2xiYWluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQzNTQ0OTAsImV4cCI6MjA1OTkzMDQ5MH0.zORhG2XBy05q8BAvWdi57QOhIt5eWxbqABu9DdBwaVY"                // ← Sustituye por tu clave
+);
 
 const carpetaImagenes = path.join(__dirname, "public/imagenes");
 
