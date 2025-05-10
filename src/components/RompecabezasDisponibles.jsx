@@ -1,156 +1,158 @@
-import { useEffect, useState, useRef } from 'react';
-import { supabase } from '../lib/supabase'; // ajusta la ruta según tengas tu cliente
-import { Gamepad2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+"use client"
+
+import { useEffect, useState, useRef, useMemo } from 'react';
+import { supabase } from '../lib/supabase';
+import { Gamepad2, Search, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function RompecabezasDisponibles() {
   const [imagenes, setImagenes] = useState([]);
   const [filtroNombre, setFiltroNombre] = useState('');
-  const [filtroDificultad, setFiltroDificultad] = useState('todos');
-  const [ordenar, setOrdenar] = useState('recientes');
-  
-  // Estado para el carrusel
   const [indiceActual, setIndiceActual] = useState(0);
   const carruselRef = useRef(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const elementosPorVista = 3; // Cuántos elementos mostrar a la vez en el carrusel (ajustable según el tamaño de pantalla)
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const elementosPorVista = 3;
+  const router = useRouter();
 
   useEffect(() => {
     const fetchImagenes = async () => {
-      const { data, error } = await supabase
-        .from('imagenesrompecabezas')
-        .select('*')
-        .order('fechasubida', { ascending: false });
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('imagenesrompecabezas')
+          .select('*')
+          .order('fechasubida', { ascending: false });
 
-      if (error) {
-        console.error('Error al obtener imágenes:', error);
-      } else {
-        setImagenes(data);
+        if (error) {
+          throw error;
+        }
+
+        setImagenes(data || []);
+      } catch (err) {
+        console.error('Error al obtener imágenes:', err);
+        setError('No se pudieron cargar los rompecabezas. Intente nuevamente más tarde.');
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchImagenes();
   }, []);
 
-  // Aplicar filtros a las imágenes
-  const imagenesFiltradas = imagenes
-    .filter(img => img.nombre.toLowerCase().includes(filtroNombre.toLowerCase()))
-    .filter(img => filtroDificultad === 'todos' || img.dificultad === filtroDificultad)
-    .sort((a, b) => {
-      if (ordenar === 'recientes') {
-        return new Date(b.fechasubida) - new Date(a.fechasubida);
-      } else if (ordenar === 'populares') {
-        return (b.jugadores || 0) - (a.jugadores || 0);
-      }
-      return 0;
-    });
+  // Memoizar las imágenes filtradas para evitar recálculos innecesarios
+  const imagenesFiltradas = useMemo(() => {
+    return imagenes.filter(img =>
+      img.nombre.toLowerCase().includes(filtroNombre.toLowerCase())
+    );
+  }, [imagenes, filtroNombre]);
 
-  // Asegurarse de que el índice actual sea válido después de filtrar
+  // Ajustar el índice cuando cambia el filtro o se cargan nuevos datos
   useEffect(() => {
-    if (indiceActual > imagenesFiltradas.length - elementosPorVista) {
-      setIndiceActual(Math.max(0, imagenesFiltradas.length - elementosPorVista));
+    const maxIndice = Math.max(0, imagenesFiltradas.length - elementosPorVista);
+    if (indiceActual > maxIndice) {
+      setIndiceActual(maxIndice);
     }
-  }, [filtroNombre, filtroDificultad, ordenar, imagenesFiltradas.length]);
+  }, [filtroNombre, imagenesFiltradas.length, indiceActual]);
 
   const navegarCarrusel = (direccion) => {
-    if (isTransitioning) return;
-    
+    if (isTransitioning || imagenesFiltradas.length <= elementosPorVista) return;
+
     setIsTransitioning(true);
-    
-    // Calcular el nuevo índice
+
+    const maxIndice = Math.max(0, imagenesFiltradas.length - elementosPorVista);
     let nuevoIndice;
+    
     if (direccion === 'siguiente') {
-      nuevoIndice = Math.min(
-        indiceActual + elementosPorVista, 
-        Math.max(0, imagenesFiltradas.length - elementosPorVista)
-      );
+      nuevoIndice = Math.min(indiceActual + elementosPorVista, maxIndice);
     } else {
       nuevoIndice = Math.max(indiceActual - elementosPorVista, 0);
     }
-    
+
     setIndiceActual(nuevoIndice);
-    
-    // Desactivar la transición después de completarse
+
     setTimeout(() => {
       setIsTransitioning(false);
-    }, 500); // Este tiempo debe coincidir con la duración de la transición CSS
+    }, 500);
   };
 
-  const getDificultadColor = (dificultad) => {
-    switch (dificultad) {
-      case 'fácil': return 'bg-green-500';
-      case 'medio': return 'bg-yellow-500';
-      case 'difícil': return 'bg-red-500';
-      default: return 'bg-gray-500';
-    }
-  };
-
-  // Determinar si los botones de navegación deben estar deshabilitados
   const puedeRetroceder = indiceActual > 0;
   const puedeAvanzar = indiceActual < imagenesFiltradas.length - elementosPorVista;
 
+  const irAJugar = (idImagen) => {
+    router.push(`/juego/${idImagen}`);
+  };
+
+  // Calcular el número de páginas para los indicadores
+  const numeroPaginas = Math.ceil(imagenesFiltradas.length / elementosPorVista);
+  const paginaActual = Math.floor(indiceActual / elementosPorVista);
+
+  // Manejar error en la carga de imágenes
+  const handleImageError = (e) => {
+    e.target.src = "/api/placeholder/400/300";
+    e.target.alt = "Imagen no disponible";
+  };
+
   return (
-    <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg">
-      <div className="p-5 bg-gradient-to-r from-purple-900/80 to-indigo-900/80">
-        <h2 className="text-xl font-bold flex items-center mb-4">
-          <Gamepad2 className="text-cyan-400 mr-2" size={20} />
-          Rompecabezas Disponibles
-        </h2>
+    <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-violet-800 rounded-2xl overflow-hidden shadow-2xl border border-purple-500/30">
+      {/* Header con animación */}
+      <div className="p-6 bg-gradient-to-r from-blue-600 to-purple-600 relative overflow-hidden">
+        {/* Partículas decorativas */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-4 left-12 w-4 h-4 bg-yellow-300 rounded-full animate-pulse opacity-70"></div>
+          <div className="absolute top-10 left-32 w-2 h-2 bg-cyan-300 rounded-full animate-ping opacity-50"></div>
+          <div className="absolute top-16 right-24 w-3 h-3 bg-pink-400 rounded-full animate-pulse opacity-60"></div>
+          <div className="absolute bottom-5 right-10 w-2 h-2 bg-green-300 rounded-full animate-ping opacity-50"></div>
+        </div>
         
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Barra de búsqueda */}
-          <div className="relative flex-grow">
-            <input
-              type="text"
-              placeholder="Buscar rompecabezas..."
-              value={filtroNombre}
-              onChange={(e) => setFiltroNombre(e.target.value)}
-              className="bg-gray-700/50 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 w-full"
-            />
-            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <h2 className="text-2xl font-bold flex items-center mb-5 text-white relative z-10">
+          <div className="bg-purple-700 p-3 rounded-xl shadow-lg mr-3 flex items-center justify-center">
+            <Gamepad2 className="text-cyan-300" size={24} />
           </div>
-          
-          {/* Filtros */}
-          <div className="flex gap-2">
-            <select 
-              value={filtroDificultad}
-              onChange={(e) => setFiltroDificultad(e.target.value)}
-              className="bg-gray-700/50 rounded-lg pl-2 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 appearance-none"
-            >
-              <option value="todos">Todas las dificultades</option>
-              <option value="fácil">Fácil</option>
-              <option value="medio">Medio</option>
-              <option value="difícil">Difícil</option>
-            </select>
-            
-            <select 
-              value={ordenar}
-              onChange={(e) => setOrdenar(e.target.value)}
-              className="bg-gray-700/50 rounded-lg pl-2 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 appearance-none"
-            >
-              <option value="recientes">Más recientes</option>
-              <option value="populares">Más populares</option>
-            </select>
-          </div>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-pink-300">
+            Rompecabezas Mágicos
+          </span>
+          <Sparkles className="ml-2 text-yellow-300" size={18} />
+        </h2>
+
+        {/* Barra de búsqueda */}
+        <div className="relative z-10">
+          <input
+            type="text"
+            placeholder="Buscar rompecabezas..."
+            value={filtroNombre}
+            onChange={(e) => setFiltroNombre(e.target.value)}
+            className="bg-indigo-900/50 backdrop-blur-sm rounded-xl pl-10 pr-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-cyan-400 w-full text-white placeholder-indigo-300 border border-indigo-600/50 shadow-lg"
+            aria-label="Buscar rompecabezas por nombre"
+          />
+          <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-cyan-400" />
         </div>
       </div>
 
       {/* Carrusel de rompecabezas */}
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-white">Explora rompecabezas</h3>
+      <div className="p-6 pt-8">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-semibold text-cyan-300 flex items-center">
+            {isLoading ? 'Cargando aventuras...' : `Explora rompecabezas (${imagenesFiltradas.length})`}
+          </h3>
           <div className="flex gap-2">
             <button 
               onClick={() => navegarCarrusel('anterior')} 
-              disabled={!puedeRetroceder}
-              className={`p-2 rounded-lg ${!puedeRetroceder ? 'text-gray-500 cursor-not-allowed' : 'text-cyan-400 hover:bg-gray-700/50'}`}
+              disabled={!puedeRetroceder || isLoading}
+              className={`p-3 rounded-full transition-all ${!puedeRetroceder || isLoading 
+                ? 'bg-indigo-800/30 text-indigo-600 cursor-not-allowed' 
+                : 'bg-indigo-700 text-cyan-300 hover:bg-indigo-600 hover:scale-110 shadow-lg hover:shadow-cyan-500/20'}`}
               aria-label="Anterior"
             >
               <ChevronLeft size={20} />
             </button>
             <button 
               onClick={() => navegarCarrusel('siguiente')} 
-              disabled={!puedeAvanzar}
-              className={`p-2 rounded-lg ${!puedeAvanzar ? 'text-gray-500 cursor-not-allowed' : 'text-cyan-400 hover:bg-gray-700/50'}`}
+              disabled={!puedeAvanzar || isLoading}
+              className={`p-3 rounded-full transition-all ${!puedeAvanzar || isLoading 
+                ? 'bg-indigo-800/30 text-indigo-600 cursor-not-allowed' 
+                : 'bg-indigo-700 text-cyan-300 hover:bg-indigo-600 hover:scale-110 shadow-lg hover:shadow-cyan-500/20'}`}
               aria-label="Siguiente"
             >
               <ChevronRight size={20} />
@@ -158,45 +160,55 @@ export default function RompecabezasDisponibles() {
           </div>
         </div>
 
-        {imagenesFiltradas.length > 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 border-4 border-t-cyan-400 border-r-pink-400 border-b-purple-400 border-l-indigo-400 rounded-full animate-spin"></div>
+              <div className="absolute inset-2 border-4 border-t-pink-400 border-r-purple-400 border-b-indigo-400 border-l-cyan-400 rounded-full animate-spin-slow"></div>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="bg-red-500/20 border border-red-500/30 text-red-100 p-5 rounded-xl">
+            <p>{error}</p>
+          </div>
+        ) : imagenesFiltradas.length > 0 ? (
           <div className="relative overflow-hidden">
-            <div 
-              ref={carruselRef} 
+            <div
+              ref={carruselRef}
               className="flex transition-transform duration-500 ease-in-out"
-              style={{ transform: `translateX(-${indiceActual * (100 / elementosPorVista)}%)` }}
+              style={{ 
+                transform: `translateX(-${(indiceActual / elementosPorVista) * (100)}%)` 
+              }}
             >
               {imagenesFiltradas.map((imagen) => (
                 <div
                   key={imagen.idimagen}
-                  className="min-w-[calc(100%/3)] px-2 sm:min-w-[calc(100%/3)] md:min-w-[calc(100%/4)] lg:min-w-[calc(100%/5)]"
+                  className="w-1/3 px-3 flex-shrink-0"
+                  style={{ flexBasis: `${100/elementosPorVista}%` }}
                 >
-                  <div className="bg-gray-700/40 rounded-lg overflow-hidden shadow-md hover:shadow-cyan-500/20 hover:transform hover:scale-105 transition duration-300 group h-full flex flex-col">
-                    <div className="relative">
+                  <div className="bg-gradient-to-b from-indigo-800/80 to-purple-800/80 backdrop-blur-md rounded-xl overflow-hidden shadow-xl border border-indigo-500/30 hover:border-cyan-400/50 hover:shadow-cyan-500/20 hover:transform hover:scale-105 transition-all duration-300 group h-full flex flex-col">
+                    <div className="relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-blue-900/30 z-10 group-hover:opacity-0 transition-opacity duration-300"></div>
                       <img
                         src={imagen.imagenurl || "/api/placeholder/400/300"}
                         alt={imagen.nombre}
-                        className="w-full h-44 object-cover transition duration-300 group-hover:brightness-110"
+                        className="w-full h-48 object-cover transition duration-300 group-hover:brightness-110 group-hover:scale-110"
+                        onError={handleImageError}
+                        loading="lazy"
                       />
-                      <div className="absolute top-2 right-2">
-                        <span className={`${getDificultadColor(imagen.dificultad)} px-2 py-1 rounded-full text-xs font-medium text-white`}>
-                          {imagen.dificultad}
-                        </span>
-                      </div>
+                      {/* Brillo decorativo en la imagen */}
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-tr from-transparent via-cyan-500/10 to-transparent transition-opacity duration-500"></div>
                     </div>
-                    <div className="p-4 flex-grow flex flex-col">
-                      <h3 className="font-semibold text-lg text-cyan-300 mb-2">{imagen.nombre}</h3>
-                      
-                      <div className="flex justify-between items-center mt-auto mb-3 text-sm text-gray-400">
-                        <span className="flex items-center">
-                          {imagen.jugadores} jugadores
-                        </span>
-                        <span className="flex items-center">
-                          {new Date(imagen.fechasubida).toLocaleDateString()}
-                        </span>
-                      </div>
-                      
-                      <button className="w-full bg-cyan-500 text-white rounded-lg py-2 px-6 font-semibold hover:bg-cyan-600 transition flex justify-center items-center gap-2">
-                        <Gamepad2 size={16} /> Jugar
+                    <div className="p-5 flex-grow flex flex-col">
+                      <h3 className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-pink-300 mb-4" title={imagen.nombre}>
+                        {imagen.nombre.length > 20 ? `${imagen.nombre.substring(0, 20)}...` : imagen.nombre}
+                      </h3>
+                      <button 
+                        onClick={() => irAJugar(imagen.idimagen)} 
+                        className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-medium rounded-lg py-3 px-4 mt-auto transform transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-cyan-500/40 flex items-center justify-center"
+                      >
+                        <Gamepad2 size={18} className="mr-2" />
+                        Jugar Ahora
                       </button>
                     </div>
                   </div>
@@ -205,20 +217,22 @@ export default function RompecabezasDisponibles() {
             </div>
           </div>
         ) : (
-          <div className="flex justify-center items-center py-12 text-gray-400">
-            No se encontraron rompecabezas que coincidan con los filtros aplicados.
+          <div className="bg-indigo-900/30 backdrop-blur-sm border border-indigo-700/30 rounded-xl py-16 px-4">
+            <p className="text-indigo-300 text-center">No se encontraron rompecabezas con ese nombre.</p>
           </div>
         )}
 
         {/* Indicadores de página del carrusel */}
-        {imagenesFiltradas.length > 0 && (
-          <div className="flex justify-center mt-4 gap-1">
-            {Array.from({ length: Math.ceil(imagenesFiltradas.length / elementosPorVista) }).map((_, idx) => (
+        {!isLoading && !error && imagenesFiltradas.length > elementosPorVista && (
+          <div className="flex justify-center mt-6 gap-2">
+            {Array.from({ length: numeroPaginas }).map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => setIndiceActual(idx * elementosPorVista)}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  indiceActual === idx * elementosPorVista ? 'bg-cyan-500' : 'bg-gray-600 hover:bg-gray-500'
+                className={`w-2.5 h-2.5 rounded-full transition-all ${
+                  paginaActual === idx 
+                    ? 'bg-gradient-to-r from-cyan-400 to-purple-400 w-8 shadow-lg shadow-purple-500/20' 
+                    : 'bg-indigo-700 hover:bg-indigo-600'
                 }`}
                 aria-label={`Ir a página ${idx + 1}`}
               />
