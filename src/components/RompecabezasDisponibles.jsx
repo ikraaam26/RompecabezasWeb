@@ -81,7 +81,7 @@ export default function RompecabezasDisponibles() {
   const puedeAvanzar = indiceActual < imagenesFiltradas.length - elementosPorVista;
 
   const irAJugar = (idImagen) => {
-    router.push(`/juego/${idImagen}`);
+    router.push(`/usuario/juego?imagen=${idImagen}`);
   };
 
   // Calcular el número de páginas para los indicadores
