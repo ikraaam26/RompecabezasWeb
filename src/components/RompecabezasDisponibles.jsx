@@ -111,7 +111,7 @@ export default function RompecabezasDisponibles() {
             <Gamepad2 className="text-cyan-300" size={24} />
           </div>
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-pink-300">
-            Rompecabezas Mágicos
+            Rompecabezas
           </span>
           <Sparkles className="ml-2 text-yellow-300" size={18} />
         </h2>
