@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase'; // ajusta la ruta según tengas tu cliente
-import { Gamepad2, Search, Filter, Award, Users, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Gamepad2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function RompecabezasDisponibles() {
   const [imagenes, setImagenes] = useState([]);
@@ -8,9 +8,11 @@ export default function RompecabezasDisponibles() {
   const [filtroDificultad, setFiltroDificultad] = useState('todos');
   const [ordenar, setOrdenar] = useState('recientes');
   
-  // Estados para paginación
-  const [paginaActual, setPaginaActual] = useState(1);
-  const elementosPorPagina = 6; // Puedes ajustar este número según prefieras
+  // Estado para el carrusel
+  const [indiceActual, setIndiceActual] = useState(0);
+  const carruselRef = useRef(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const elementosPorVista = 3; // Cuántos elementos mostrar a la vez en el carrusel (ajustable según el tamaño de pantalla)
 
   useEffect(() => {
     const fetchImagenes = async () => {
@@ -42,24 +44,35 @@ export default function RompecabezasDisponibles() {
       return 0;
     });
 
-  // Cálculos para la paginación
-  const totalPaginas = Math.ceil(imagenesFiltradas.length / elementosPorPagina);
-  
-  // Asegurarse de que la página actual sea válida después de filtrar
+  // Asegurarse de que el índice actual sea válido después de filtrar
   useEffect(() => {
-    if (paginaActual > totalPaginas && totalPaginas > 0) {
-      setPaginaActual(1);
+    if (indiceActual > imagenesFiltradas.length - elementosPorVista) {
+      setIndiceActual(Math.max(0, imagenesFiltradas.length - elementosPorVista));
     }
-  }, [filtroNombre, filtroDificultad, ordenar, totalPaginas]);
+  }, [filtroNombre, filtroDificultad, ordenar, imagenesFiltradas.length]);
 
-  // Obtener las imágenes de la página actual
-  const indiceInicial = (paginaActual - 1) * elementosPorPagina;
-  const imagenesEnPaginaActual = imagenesFiltradas.slice(indiceInicial, indiceInicial + elementosPorPagina);
-
-  const irAPagina = (numeroPagina) => {
-    if (numeroPagina >= 1 && numeroPagina <= totalPaginas) {
-      setPaginaActual(numeroPagina);
+  const navegarCarrusel = (direccion) => {
+    if (isTransitioning) return;
+    
+    setIsTransitioning(true);
+    
+    // Calcular el nuevo índice
+    let nuevoIndice;
+    if (direccion === 'siguiente') {
+      nuevoIndice = Math.min(
+        indiceActual + elementosPorVista, 
+        Math.max(0, imagenesFiltradas.length - elementosPorVista)
+      );
+    } else {
+      nuevoIndice = Math.max(indiceActual - elementosPorVista, 0);
     }
+    
+    setIndiceActual(nuevoIndice);
+    
+    // Desactivar la transición después de completarse
+    setTimeout(() => {
+      setIsTransitioning(false);
+    }, 500); // Este tiempo debe coincidir con la duración de la transición CSS
   };
 
   const getDificultadColor = (dificultad) => {
@@ -70,6 +83,10 @@ export default function RompecabezasDisponibles() {
       default: return 'bg-gray-500';
     }
   };
+
+  // Determinar si los botones de navegación deben estar deshabilitados
+  const puedeRetroceder = indiceActual > 0;
+  const puedeAvanzar = indiceActual < imagenesFiltradas.length - elementosPorVista;
 
   return (
     <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg">
@@ -117,141 +134,98 @@ export default function RompecabezasDisponibles() {
         </div>
       </div>
 
-      {/* Rompecabezas destacado del día 
-      <div className="mx-6 my-4 bg-gradient-to-r from-blue-900/40 to-purple-900/40 p-4 rounded-lg">
-        <div className="flex items-center mb-2">
-          <Award className="text-yellow-400 mr-2" size={18} />
-          <h3 className="text-yellow-400 font-bold">Rompecabezas del día</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <img 
-            src="/api/placeholder/400/300"
-            alt="Rompecabezas del día" 
-            className="w-full h-48 object-cover rounded-lg"
-          />
-          <div className="md:col-span-2">
-            <h4 className="text-lg font-semibold text-white mb-2">Amanecer en el océano</h4>
-            <p className="text-gray-300 text-sm mb-3">Un hermoso amanecer sobre el océano con colores vibrantes que ponen a prueba tu capacidad para distinguir tonalidades.</p>
-            <div className="flex items-center gap-4 mb-3">
-              <span className="flex items-center text-sm text-gray-400">
-                <Users size={14} className="mr-1" /> 248 jugadores
-              </span>
-              <span className="px-2 py-1 rounded-full text-xs font-medium text-white bg-yellow-500">
-                Dificultad: Media
-              </span>
-            </div>
-            <button className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg py-2 px-6 font-semibold hover:from-cyan-600 hover:to-blue-700 transition transform hover:scale-105">
-              Jugar ahora
-            </button>
-          </div>
-        </div>
-      </div>
-      */}
-
-      {/* Lista de rompecabezas */}
-      <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {imagenesEnPaginaActual.length > 0 ? (
-          imagenesEnPaginaActual.map((imagen) => (
-            <div
-              key={imagen.idimagen}
-              className="bg-gray-700/40 rounded-lg overflow-hidden shadow-md hover:shadow-cyan-500/20 hover:transform hover:scale-105 transition duration-300 group"
-            >
-              <div className="relative">
-                <img
-                  src={imagen.imagenurl}
-                  alt={imagen.nombre}
-                  className="w-full h-48 object-cover transition duration-300 group-hover:brightness-110"
-                />
-                <div className="absolute top-2 right-2">
-                  <span className={`${getDificultadColor(imagen.dificultad)} px-2 py-1 rounded-full text-xs font-medium text-white`}>
-                    {imagen.dificultad}
-                  </span>
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-lg text-cyan-300 mb-2">{imagen.nombre}</h3>
-                
-                <div className="flex justify-between items-center mb-3 text-sm text-gray-400">
-                  <span className="flex items-center">
-                    <Users size={14} className="mr-1" /> {imagen.jugadores}
-                  </span>
-                  <span className="flex items-center">
-                    <Clock size={14} className="mr-1" /> {new Date(imagen.fechasubida).toLocaleDateString()}
-                  </span>
-                </div>
-                
-                <button className="w-full bg-cyan-500 text-white rounded-lg py-2 px-6 font-semibold hover:bg-cyan-600 transition flex justify-center items-center gap-2">
-                  <Gamepad2 size={16} /> Jugar
-                </button>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="col-span-1 sm:col-span-2 lg:col-span-3 flex justify-center items-center py-12 text-gray-400">
-            No se encontraron rompecabezas que coincidan con los filtros aplicados.
-          </div>
-        )}
-      </div>
-
-      {/* Controles de paginación */}
-      {totalPaginas > 0 && (
-        <div className="flex justify-center items-center pb-6 pt-2">
-          <div className="flex items-center gap-1">
+      {/* Carrusel de rompecabezas */}
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-white">Explora rompecabezas</h3>
+          <div className="flex gap-2">
             <button 
-              onClick={() => irAPagina(paginaActual - 1)} 
-              disabled={paginaActual === 1}
-              className={`p-2 rounded-lg ${paginaActual === 1 ? 'text-gray-500 cursor-not-allowed' : 'text-cyan-400 hover:bg-gray-700/50'}`}
+              onClick={() => navegarCarrusel('anterior')} 
+              disabled={!puedeRetroceder}
+              className={`p-2 rounded-lg ${!puedeRetroceder ? 'text-gray-500 cursor-not-allowed' : 'text-cyan-400 hover:bg-gray-700/50'}`}
+              aria-label="Anterior"
             >
               <ChevronLeft size={20} />
             </button>
-            
-            {/* Mostrar números de página */}
-            <div className="flex items-center gap-1">
-              {[...Array(totalPaginas).keys()].map(numero => {
-                // Mostrar siempre la primera página, la última y algunas alrededor de la actual
-                const numeroPagina = numero + 1;
-                
-                // Lógica para mostrar un conjunto limitado de páginas
-                if (
-                  numeroPagina === 1 || 
-                  numeroPagina === totalPaginas ||
-                  (numeroPagina >= paginaActual - 1 && numeroPagina <= paginaActual + 1)
-                ) {
-                  return (
-                    <button
-                      key={numeroPagina}
-                      onClick={() => irAPagina(numeroPagina)}
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg ${
-                        paginaActual === numeroPagina
-                          ? 'bg-cyan-500 text-white'
-                          : 'text-gray-300 hover:bg-gray-700/50'
-                      }`}
-                    >
-                      {numeroPagina}
-                    </button>
-                  );
-                } else if (
-                  (numeroPagina === 2 && paginaActual > 3) ||
-                  (numeroPagina === totalPaginas - 1 && paginaActual < totalPaginas - 2)
-                ) {
-                  // Mostrar puntos suspensivos
-                  return <span key={numeroPagina} className="text-gray-400">...</span>;
-                }
-                
-                return null;
-              })}
-            </div>
-            
             <button 
-              onClick={() => irAPagina(paginaActual + 1)} 
-              disabled={paginaActual === totalPaginas}
-              className={`p-2 rounded-lg ${paginaActual === totalPaginas ? 'text-gray-500 cursor-not-allowed' : 'text-cyan-400 hover:bg-gray-700/50'}`}
+              onClick={() => navegarCarrusel('siguiente')} 
+              disabled={!puedeAvanzar}
+              className={`p-2 rounded-lg ${!puedeAvanzar ? 'text-gray-500 cursor-not-allowed' : 'text-cyan-400 hover:bg-gray-700/50'}`}
+              aria-label="Siguiente"
             >
               <ChevronRight size={20} />
             </button>
           </div>
         </div>
-      )}
+
+        {imagenesFiltradas.length > 0 ? (
+          <div className="relative overflow-hidden">
+            <div 
+              ref={carruselRef} 
+              className="flex transition-transform duration-500 ease-in-out"
+              style={{ transform: `translateX(-${indiceActual * (100 / elementosPorVista)}%)` }}
+            >
+              {imagenesFiltradas.map((imagen) => (
+                <div
+                  key={imagen.idimagen}
+                  className="min-w-[calc(100%/3)] px-2 sm:min-w-[calc(100%/3)] md:min-w-[calc(100%/4)] lg:min-w-[calc(100%/5)]"
+                >
+                  <div className="bg-gray-700/40 rounded-lg overflow-hidden shadow-md hover:shadow-cyan-500/20 hover:transform hover:scale-105 transition duration-300 group h-full flex flex-col">
+                    <div className="relative">
+                      <img
+                        src={imagen.imagenurl || "/api/placeholder/400/300"}
+                        alt={imagen.nombre}
+                        className="w-full h-44 object-cover transition duration-300 group-hover:brightness-110"
+                      />
+                      <div className="absolute top-2 right-2">
+                        <span className={`${getDificultadColor(imagen.dificultad)} px-2 py-1 rounded-full text-xs font-medium text-white`}>
+                          {imagen.dificultad}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-4 flex-grow flex flex-col">
+                      <h3 className="font-semibold text-lg text-cyan-300 mb-2">{imagen.nombre}</h3>
+                      
+                      <div className="flex justify-between items-center mt-auto mb-3 text-sm text-gray-400">
+                        <span className="flex items-center">
+                          {imagen.jugadores} jugadores
+                        </span>
+                        <span className="flex items-center">
+                          {new Date(imagen.fechasubida).toLocaleDateString()}
+                        </span>
+                      </div>
+                      
+                      <button className="w-full bg-cyan-500 text-white rounded-lg py-2 px-6 font-semibold hover:bg-cyan-600 transition flex justify-center items-center gap-2">
+                        <Gamepad2 size={16} /> Jugar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-center items-center py-12 text-gray-400">
+            No se encontraron rompecabezas que coincidan con los filtros aplicados.
+          </div>
+        )}
+
+        {/* Indicadores de página del carrusel */}
+        {imagenesFiltradas.length > 0 && (
+          <div className="flex justify-center mt-4 gap-1">
+            {Array.from({ length: Math.ceil(imagenesFiltradas.length / elementosPorVista) }).map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setIndiceActual(idx * elementosPorVista)}
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  indiceActual === idx * elementosPorVista ? 'bg-cyan-500' : 'bg-gray-600 hover:bg-gray-500'
+                }`}
+                aria-label={`Ir a página ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
