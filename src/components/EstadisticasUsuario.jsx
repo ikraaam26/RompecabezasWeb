@@ -35,7 +35,6 @@ export default function GameStatsComponent({ usuario }) {
           .from('partidas')
           .select('tamañorompecabezas, count(*)')
           .eq('idusuario', usuario.id)
-          .group('tamañorompecabezas')
           .order('count', { ascending: false })
           .limit(1);
           
